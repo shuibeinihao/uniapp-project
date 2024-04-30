@@ -1,0 +1,295 @@
+<template>
+  <view class="container">
+    <view class="search-bar-item">
+      <uni-datetime-picker type="date" :clear-icon="false" v-model="formModel.interviewDate" @change="onChange" />
+    </view>
+    <view class="search-bar-item">
+      <uni-data-select
+        v-model="formModel.gatherPoint"
+        :localdata="labelData?.enterprise_post_info_gather_point"
+        placeholder="集合地点"
+        @change="onChange"
+      ></uni-data-select>
+    </view>
+    <view class="filter-btn" @click="onFilter">
+      <view class="btn">筛选</view>
+      <image class="icon" src="/static/filter.png"></image>
+    </view>
+  </view>
+  <uni-popup ref="popupRef" type="right" background-color="#fff" @change="change">
+    <view class="popup-content">
+      <view class="popup-content-form">
+        <uni-forms v-model="formModel" label-width="80px">
+          <uni-forms-item label="签到设置" name="signPosition">
+            <uni-data-select v-model="formModel.signPosition" :localdata="signPositionArr"
+                placeholder="请选择签到设置"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="类型" name="positionType">
+            <uni-data-select v-model="formModel.positionType" :localdata="labelData?.enterprise_post_info_post_type"
+                placeholder="请选择类型"></uni-data-select>
+            <!-- <uni-datetime-picker v-model="formModel.contactTime_between" type="daterange" :clear-icon="false" /> -->
+          </uni-forms-item>
+          <uni-forms-item label="企业简称" name="enterpriseId">
+            <uni-data-select v-model="formModel.enterpriseId" :localdata="companyState.data"
+                placeholder="请选择企业简称"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="工种" name="workType">
+            <uni-data-select v-model="formModel.workType" :localdata="labelData?.enterprise_post_info_work_type"
+                placeholder="请选择工种"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="报价" name="offerPrice">
+            <uni-data-select v-model="formModel.offerPrice" :localdata="labelData?.enterprise_post_info_offer_price"
+                placeholder="请选择报价"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="姓名" name="customerName">
+            <uni-easyinput type="text" v-model="formModel.customerName" placeholder="请输入姓名" />
+          </uni-forms-item>
+          <uni-forms-item label="性别" name="sex">
+            <uni-data-select v-model="formModel.sex" :localdata="sexArr"
+                placeholder="请选择性别"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="身份证号" name="idCard">
+            <uni-easyinput type="text" v-model="formModel.idCard" placeholder="请输入身份证号" />
+          </uni-forms-item>
+          <uni-forms-item label="手机号" name="phoneNumber">
+            <uni-easyinput type="text" v-model="formModel.phoneNumber" placeholder="请输入手机号" />
+          </uni-forms-item>
+          <uni-forms-item label="推荐人姓名" name="referenceName">
+            <uni-easyinput type="text" v-model="formModel.referenceName" placeholder="请输入推荐人姓名" />
+          </uni-forms-item>
+          <uni-forms-item label="推荐人身份证号" name="referenceIdCard">
+            <uni-easyinput type="text" v-model="formModel.referenceIdCard" placeholder="请输入推荐人身份证号" />
+          </uni-forms-item>
+          <uni-forms-item label="签到状态" name="signState">
+            <uni-data-select v-model="formModel.signState" :localdata="formattedDict(signStatusArr)"
+                placeholder="请选择签到状态"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="面试状态" name="interviewState">
+            <uni-data-select v-model="formModel.interviewState" :localdata="formattedDict(interviewStatusArr)"
+                placeholder="请选择面试状态"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="入职状态" name="entryState">
+            <uni-data-select v-model="formModel.entryState" :localdata="formattedDict(entryStatusArr)"
+                placeholder="请选择入职状态"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="在离职状态" name="departState">
+            <uni-data-select v-model="formModel.departState" :localdata="formattedDict(departStatusArr)"
+                placeholder="请选择在离职状态"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="求职者结算状态" name="memeberState">
+            <uni-data-select v-model="formModel.memeberState" :localdata="formattedDict(memberSettleStatusArr)"
+                placeholder="请选择求职者结算状态"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="推荐费结算状态" name="referenceState">
+            <uni-data-select v-model="formModel.referenceState" :localdata="formattedDict(referenceSettleStatusArr)"
+                placeholder="请选择推荐费结算状态"></uni-data-select>
+          </uni-forms-item>
+          <uni-forms-item label="经纪人结算状态" name="agentState">
+            <uni-data-select v-model="formModel.agentState" :localdata="formattedDict(agentSettleStatusArr)"
+                placeholder="请选择经纪人结算状态"></uni-data-select>
+          </uni-forms-item>
+        </uni-forms>
+      </view>
+      <view class="popup-content-footer">
+        <button class="info plain" @click="handleReset">重置</button>
+        <button class="primary" @click="handleSearch">查询</button>
+      </view>
+    </view>
+  </uni-popup>
+</template>
+
+<script setup lang="ts">
+import { ref, nextTick, computed } from 'vue';
+import dayjs from 'dayjs';
+import { useRequest } from '../../utils/hooks';
+import { formattedDict } from '../../utils/index';
+import { signStatusArr, interviewStatusArr, 
+  entryStatusArr, departStatusArr,
+  memberSettleStatusArr, referenceSettleStatusArr,
+  agentSettleStatusArr
+} from '../../constants/index';
+
+const { labelData } = defineProps<{
+  labelData?: Record<string, Array<{ name: string; key: string }>>;
+}>()
+
+const emit = defineEmits < {
+    (event: 'search', value: any): void;
+  } > ()
+
+const sexArr = ref([{
+  text: '男',
+  value: 'M'
+}, {
+  text: '女',
+  value: 'F'
+}])
+
+const signPositionArr = ref([{
+  text: '?',
+  value: 'NULL'
+}, {
+  text: '完成',
+  value: 'NOT_NULL'
+}])
+
+const { state: companyState } = useRequest<any>({
+  url: '/goods/enterprise/listAll',
+  method: 'get',
+  formatted: (res: any) => {
+    if (Array.isArray(res.rows)) {
+      const result = res.rows?.map((item: any) => {
+        item.text = item.abbreviationName;
+        item.value = item.enterpriseId;
+        return item;
+      });
+      result.unshift({
+        text: '?',
+        value: ''
+      });
+      return result;
+    }
+    return [];
+  }
+})
+
+const formModel = ref({
+  interviewDate: dayjs().format('YYYY-MM-DD')
+});
+
+const popupRef = ref();
+
+const onFilter = () => {
+  popupRef.value?.open();
+}
+
+const handleReset = () => {
+  formModel.value = {};
+}
+
+const onChange = (value: string) => {
+  nextTick(() => {
+    handleSearch();
+  })
+}
+
+const handleSearch = () => {
+  const params = { ...formModel.value } as Record<string, any>;
+  if (formModel.value.age_start || formModel.value.age_end) {
+    params.age_between = [formModel.value.age_start, formModel.value.age_end];
+    delete params.age_start;
+    delete params.age_end;
+  }
+  if (formModel.value.notContactTime_start || formModel.value.notContactTime_end) {
+    params.notContactTime_between = [formModel.value.notContactTime_start, formModel.value.notContactTime_end];
+    delete params.notContactTime_start;
+    delete params.notContactTime_end;
+  }
+  emit('search', params);
+  popupRef.value?.close();
+}
+</script>
+<style lang="scss" scoped>
+.container {
+  display: flex;
+  position: relative;
+  padding-right: 100rpx;
+  white-space: nowrap;
+  .search-bar-item {
+    flex: 1;
+    margin-right: 10px;
+  }
+  .filter-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    padding-right: 12rpx;
+    font-size: 28rpx;
+    color: #747685;
+    background-color: #fff;
+    z-index: 2;
+    .btn {
+      position: relative;
+      height: 90rpx;
+      line-height: 90rpx;
+      padding-left: 12rpx;
+      background-color: #fff;
+      z-index: 2;
+    }
+    .icon {
+      margin-left: 6rpx;
+      width: 28rpx;
+      height: 28rpx;
+    }
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10rpx;
+      bottom: 10rpx;
+      width: 1px;
+      // background-color: #ebeef5;
+      box-shadow: -2rpx 0 10rpx 0 #333;
+      z-index: 1;
+    }
+  }
+}
+</style>
+<style lang="scss">
+.popup-content {
+  position: relative;
+  width: 90vw;
+  height: 100vh;
+  padding: 20rpx;
+  box-sizing: border-box;
+  background-color: #fff;
+  &-form {
+    height: calc(100vh - 132rpx);
+    overflow-y: auto;
+    .range {
+      display: flex;
+      align-items: center;
+      .sep {
+        padding: 0 10rpx;
+      }
+    }
+  }
+  &-footer {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    padding: 20rpx;
+    background-color: #fff;
+    box-sizing: border-box;
+    z-index: 90;
+    box-shadow: 0 -2rpx 10rpx 0 rgba(0, 0, 0, 0.1);
+    button {
+      display: inline-block;
+      width: calc(50% - 16rpx);
+      height: 80rpx;
+      line-height: 80rpx;
+      font-size: 28rpx;
+      border-radius: 40rpx;
+      background-color: #f7f8fa;
+      &::after {
+        border: none;
+      }
+      &.primary {
+        background-color: #2979ff;
+        color: #fff;
+      }
+      &.plain.info {
+        color: #999;
+        border-color: 2rpx solid #999;
+      }
+      & + button {
+        margin-left: 20rpx;
+      }
+    }
+  }
+}
+</style>
